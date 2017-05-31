@@ -8,7 +8,7 @@ from greedy_min_rules_tablesize import greedy_hybrid_model_tablesize
 from SelectPaths_greedy import buffered_paths_greedy_model
 from SelectPaths_greedy_tablesize import buffered_paths_greedy_model_tablesize
 from SelectPaths_optimal_new import buffered_paths_lp_model
-from optimal_loss import optimal_loss_model
+from secure_path import optimal_loss_model
 from SelectPaths_shortest import buffered_paths_shortest_path
 from NewModels.capacity_setting import get_fixed_capacity
 from gurobipy import *
