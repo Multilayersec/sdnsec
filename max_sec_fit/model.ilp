@@ -1,0 +1,37 @@
+\ Model securepaths_copy
+\ LP format - for model browsing. Use MPS format to capture full model detail.
+Maximize
+ 
+Subject To
+ arcflow_Jersey+City,+NJ244_Oak+Brook,+IL310_c3:
+   z_c3_Jersey+City,+NJ244_Jersey+City,+NJ261
+   + z_c3_Jersey+City,+NJ244_Frankfurt184
+   + z_c3_Jersey+City,+NJ244_Jersey+City,+NJ245
+   + z_c3_Jersey+City,+NJ244_Weehawken,+NJ543
+   + z_c3_Jersey+City,+NJ244_Waltham,+MA568
+   + z_c3_Jersey+City,+NJ244_London277
+   + z_c3_Jersey+City,+NJ244_Waltham,+MA569 <= 1
+ secclass_Frankfurt185_Frankfurt184_c3:
+   - z_c3_Jersey+City,+NJ244_Frankfurt184 + z_c3_Frankfurt185_Amsterdam119
+   = 0
+ secclass_Frankfurt185_Toronto,+Canada537_c3:
+   - z_c3_Waltham,+MA555_Toronto,+Canada537
+   + z_c3_Frankfurt185_Amsterdam119 = 0
+ secclass_London277_Toronto,+Canada537_c3:
+   - z_c3_Waltham,+MA555_Toronto,+Canada537
+   + z_c3_London277_Jersey+City,+NJ244 = 0
+ node_c3_Frankfurt185: z_c3_Amsterdam119_Frankfurt185
+   - z_c3_Frankfurt185_Amsterdam119 = -1
+ node_c3_London277: z_c3_Jersey+City,+NJ244_London277
+   - z_c3_London277_Jersey+City,+NJ244 = 0
+Bounds
+Binaries
+ z_c3_Amsterdam119_Frankfurt185 z_c3_Jersey+City,+NJ244_Jersey+City,+NJ261
+ z_c3_Jersey+City,+NJ244_Frankfurt184
+ z_c3_Jersey+City,+NJ244_Jersey+City,+NJ245
+ z_c3_Jersey+City,+NJ244_Weehawken,+NJ543
+ z_c3_Jersey+City,+NJ244_Waltham,+MA568 z_c3_Jersey+City,+NJ244_London277
+ z_c3_Jersey+City,+NJ244_Waltham,+MA569
+ z_c3_Waltham,+MA555_Toronto,+Canada537 z_c3_London277_Jersey+City,+NJ244
+ z_c3_Frankfurt185_Amsterdam119
+End
