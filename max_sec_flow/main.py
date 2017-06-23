@@ -31,7 +31,7 @@ def getGraph():
     #fname="/home/stefan/Desktop/FLIP/Rocketfuel/3967/weights.intra"
     fname = "/home/stefan/Desktop/FLIP/Rocketfuel/1239/weights.intra"
 
-    capac = 10
+    capac = 100
 
     nodes = []
     arcs = []
@@ -73,7 +73,7 @@ def get_security_class(secclass):
     elif secclass=='Top Secret':
         return 4
     else:
-        return 1
+        return 0
 
 def get_rand_secclass():
     randsc = random.randint(1,100)
@@ -97,59 +97,181 @@ def get_rand_seccategory():
 
 def topo_map():
     executions=100
+    rounds=10
     avg_solution = {}
     avg_misses = {}
     infcounter=0
+
+    dynamic = 0
+
     for round in range(0,executions):
         graph, cap_graph, max_rule_graph, nodes, arcs = getGraph()
 
-        node_neighbors={}
-        for (i,j) in arcs:
-            if not node_neighbors.has_key(i):
-                node_neighbors[i] = []
-            node_neighbors[i].append(j)
+        #define pool of source and target nodes with labels
+        #*****************************
+        sourcepool = []
+        targetpool = []
 
-        edge_nodes=[]
-        for i in node_neighbors.keys():
-            if len(node_neighbors[i]) == 1:
-                edge_nodes.append(i)
 
-        print edge_nodes
+        for i in range(0, 30):
+            s_node = random.choice(nodes)
+            while s_node in sourcepool:
+                s_node = random.choice(nodes)
+            sourcepool.append(s_node)
+
+        for i in range(0, 50):
+            t_node = random.choice(nodes)
+            while t_node in sourcepool or t_node in targetpool:
+                t_node = random.choice(nodes)
+            targetpool.append(t_node)
+            # c = commodities[i]
+            # demand[c, t_node] = 1
 
         security_labels = {}
-
         for i in nodes:
             security_labels[i] = {}
-            security_labels[i][0] = get_rand_secclass()
-            for c in range(1,6):
-                security_labels[i][c] = get_rand_seccategory()
+            if i in sourcepool or i in targetpool:
+                security_labels[i][0] = get_rand_secclass()
+                for c in range(1,6):
+                    security_labels[i][c] = get_rand_seccategory()
+            else:
+                if dynamic==0:
+                    security_labels[i][0] = get_rand_secclass()
+                else:
+                    security_labels[i][0] = 0
+                for c in range(1, 6):
+                    security_labels[i][c] = 0
+        # *****************************
 
-        #secure_path(nodes,arcs,cap_graph,security_labels)
-        #secure_path_sumvio(nodes, arcs, cap_graph, security_labels)
-        solution,missingcats = secure_path_minviobound(nodes, arcs, cap_graph, security_labels)
-        if solution != 'Infeasible':
-            avg_solution[round] = solution
-            avg_misses[round] = missingcats
-        else:
-            infcounter+=1
+        print "SEC labels initial.."
+        for c in range(0, 5):
+            cnt = 0
+            for k in security_labels.keys():
+                if security_labels[k][0] == c:
+                    cnt += 1
+            print "Category " + str(c) + " cnt: " + str(cnt)
+
+        commodities = []
+        comcounter=0
+
+        fd = {}
+        sourcenodes = {}
+        production = []
+        demand = []
+
+        nodeusage = {}
+        for netconf in range(0, rounds):
+            round_commodities = {}
+            round_commodities_list = []
+            sources = {}
+            targets = {}
+
+            #add commodities
+            for c in range(0, 10):
+                commodities.append('c' + str(comcounter))
+                fd['c' + str(comcounter)] = 1
+                round_commodities[c] = 'c' + str(comcounter)
+                round_commodities_list.append('c' + str(comcounter))
+                comcounter+=1
+
+            #select random sources and destinations
+            for i in range(0, 10):
+                s_node = random.choice(sourcepool)
+                while s_node in sources.values():
+                    s_node = random.choice(sourcepool)
+                sources[i] = (s_node)
+                sourcenodes[round_commodities[i]] = (s_node)
+                production.append((s_node,round_commodities[i]))
+
+            for i in range(0, 25):
+                t_node = random.choice(targetpool)
+                while t_node in sources.values() or t_node in targets.values():
+                    t_node = random.choice(targetpool)
+                targets[i] = (t_node)
+                for c in round_commodities.values():
+                    demand.append((t_node,c))
+
+            solution,missingcats = secure_path_minviobound(round_commodities_list, fd, nodes, sourcenodes, production, sources, demand, targets, arcs, cap_graph, security_labels)
+
+            '''
+            print "SEC labels before..."
+            for c in range(0, 5):
+                cnt = 0
+                for k in security_labels.keys():
+                    if security_labels[k][0] == c:
+                        cnt += 1
+                print "Category " + str(c) + " cnt: " + str(cnt)
+            '''
+            if dynamic == 1:
+                for key in solution.keys():
+                    secclass=None
+                    for i,j,si,sj in solution[key]:
+                        if not nodeusage.has_key(i):
+                            nodeusage[i]=0
+                        nodeusage[i] = nodeusage[i] + 1
+
+                        if i == sourcenodes[key]:
+                            secclass = si[0]
+
+                    for i, j, si, sj in solution[key]:
+                        if security_labels[i][0]==0:
+                            security_labels[i][0] = secclass
+                            #print " SEC CLASS UPDATE 1"
+
+            '''
+            print "SEC labels after.."
+            for c in range(0, 5):
+                cnt = 0
+                for k in security_labels.keys():
+                    if security_labels[k][0] == c:
+                        cnt += 1
+                print "Category " + str(c) + " cnt: " + str(cnt)
+            '''
+
+            if solution != 'Infeasible':
+                avg_solution[round,netconf] = solution
+                avg_misses[round,netconf] = missingcats
+
+                #depart flows
+                if dynamic == 1:
+                    departing=[]
+                    for i in range(0,3):
+                        c = random.choice(commodities)
+                        departing.append(c)
+                        commodities.remove(c)
+
+                    for (curround,curnetconf) in avg_solution.keys():
+                        if curround==round and curnetconf==netconf:
+                            for com in avg_solution[(curround,curnetconf)].keys():
+                                if com in departing:
+                                    for i, j, si, sj in avg_solution[(curround,curnetconf)][com]:
+                                        nodeusage[i] = nodeusage[i] - 1
+                                        if nodeusage[i]==0 and i not in sourcepool and i not in targetpool:
+                                            security_labels[i][0] = 0
+                                            #print " SEC CLASS UPDATE 2"
+
+            else:
+                infcounter+=1
+
+    sumruns=executions*rounds
 
     avgresults={}
-    for rkey in avg_solution.keys():
-        for key in avg_solution[rkey]:
-            for (i,j,seci,secj) in avg_solution[rkey][key]:
+    for (rkey,confkey) in avg_solution.keys():
+        for key in avg_solution[(rkey,confkey)]:
+            for (i,j,seci,secj) in avg_solution[(rkey,confkey)][key]:
                 if not avgresults.has_key(key):
                     avgresults[key] = []
                 avgresults[key].append((i,j,seci,secj))
-    visualize_results(avgresults,executions)
+    visualize_results(avgresults,sumruns)
 
     avgresults={}
-    for rkey in avg_misses.keys():
-        for key in avg_misses[rkey]:
-            cnt = avg_misses[rkey][key]
+    for (rkey,confkey) in avg_misses.keys():
+        for key in avg_misses[(rkey,confkey)]:
+            cnt = avg_misses[(rkey,confkey)][key]
             if not avgresults.has_key(key):
                 avgresults[key] = 0
             avgresults[key] = avgresults[key] + cnt
-    visualize_misses(avgresults,executions)
+    visualize_misses(avgresults,sumruns)
 
     print 'Infeasible counter: ' + str(infcounter)
     return security_labels

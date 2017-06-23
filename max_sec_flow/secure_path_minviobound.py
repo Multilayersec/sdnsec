@@ -19,13 +19,15 @@ import copy
 from draw_graph import draw_graph
 from result_evaluation import visualize_results
 
-def secure_path_minviobound(nodes,arcs,capacity,security_labels):
+def diff_funct(sourceval,nodeval):
+    if(sourceval == 0 or nodeval == 0):
+        return 0
+    else:
+        return abs(sourceval-nodeval)
 
-    commodities=[]
 
-    production={}
-    demand={}
-    fd={}
+def secure_path_minviobound(commodities,fd,nodes,sourcenodes,production,sources,demand,targets,arcs,capacity,security_labels):
+
 
     sec_classes=security_labels
     sec_categories={}
@@ -36,34 +38,6 @@ def secure_path_minviobound(nodes,arcs,capacity,security_labels):
         for j in nodes:
             if (i,j) in arcs:
                 arc_nodes[i].append(j)
-
-    for c in range(0,10):
-        commodities.append('c' + str(c))
-
-    sources = {}
-    sourcenodes = {}
-    targets = {}
-    for i in range(0, 10):
-        s_node = random.choice(nodes)
-        while s_node in sources.items():
-            s_node = random.choice(nodes)
-        sources[i] = (s_node)
-
-        c = commodities[i]
-        production[c,s_node]=5
-        sourcenodes[c] = s_node
-        fd[c]=5
-
-    for i in range(0, 35):
-        t_node = random.choice(nodes)
-        while t_node in sources.items() and t_node in targets.items():
-            t_node = random.choice(nodes)
-        targets[i] = (t_node)
-        #c = commodities[i]
-        #demand[c, t_node] = 1
-
-        for c in commodities:
-            demand[c, t_node] = 1
 
     gamma = 100
 
@@ -84,14 +58,14 @@ def secure_path_minviobound(nodes,arcs,capacity,security_labels):
 
     #+ 1000*quicksum((sec_classes[sourcenodes[h]][c] + sec_classes[j][c])%2 for c in range(1,6))
     m.update()
-    m.setObjective(quicksum(quicksum(flow[h, i, j] * (pow(gamma,abs(sec_classes[sourcenodes[h]][0] - sec_classes[j][0]))) for i, j in arcs) + pow(gamma,2)*quicksum(quicksum(delta[t,h]*(sec_classes[sourcenodes[h]][c]-sec_classes[sourcenodes[h]][c]*sec_classes[t][c]) for c in range(1,6)) for t in targets.values()) for h in commodities), GRB.MINIMIZE)
+    m.setObjective(quicksum(quicksum(flow[h, i, j] * (pow(gamma,diff_funct(sec_classes[sourcenodes[h]][0],sec_classes[j][0]))) for i, j in arcs) + quicksum(delta[t,h]*quicksum(pow(gamma,2)*(sec_classes[sourcenodes[h]][c]-sec_classes[sourcenodes[h]][c]*sec_classes[t][c]) for c in range(1,6)) for t in targets.values()) for h in commodities), GRB.MINIMIZE)
     #m.setObjective((gamma), GRB.MINIMIZE)
     m.update()
 
-    for i in nodes:
-        for h in commodities:
+    #for i in nodes:
+    #    for h in commodities:
             #m.addConstr(quicksum(z[h,i,j] for j in nodes if (i,j) in arcs) <= 1,'sum_%s_%s_%s' % (i, j, h))
-            m.addConstr(quicksum(flow[h,i,j] for j in arc_nodes[i]) <= 1, 'arcflow_%s_%s_%s' % (i, j, h))
+    #        m.addConstr(quicksum(flow[h,i,j] for j in arc_nodes[i]) <= 1, 'arcflow_%s_%s_%s' % (i, j, h))
 
     for h in commodities:
         m.addConstr(quicksum(delta[t,h] for t in targets.values()) == 1, 'delta_%s_%s' % (t,h))
@@ -107,12 +81,12 @@ def secure_path_minviobound(nodes,arcs,capacity,security_labels):
 
     for h in commodities:
         for j in nodes:
-            if (h, j) in production:
-                m.addConstr(quicksum(flow[h,i,j] for i,j in arcs.select('*',j)) + 1 == quicksum(flow[h,j,k] for j,k in arcs.select(j,'*')), 'flowconst_%s_%s' % (h, j))
-            elif (h, j) in demand:
-                m.addConstr(quicksum(flow[h,i,k] for i,k in arcs.select('*',j)) - delta[j,h] == 0, 'flowconst_%s_%s' % (h, j))
-            elif (h, j) not in production and (h, j) not in demand:
-                m.addConstr(quicksum(flow[h,i,j] for i,j in arcs.select('*',j)) == quicksum(flow[h,j,k] for j,k in arcs.select(j,'*')), 'flowconst_%s_%s' % (h, j))
+            if (j,h) in production:
+                m.addConstr(quicksum(flow[h,i,j] for i,j in arcs.select('*',j)) + 1 == quicksum(flow[h,j,k] for j,k in arcs.select(j,'*')), 'source_flowconst_%s_%s' % (h, j))
+            elif (j,h) in demand:
+                m.addConstr(quicksum(flow[h,i,k] for i,k in arcs.select('*',j)) - delta[j,h] == 0, 'target_flowconst_%s_%s' % (h, j))
+            elif (j,h) not in production and (j,h) not in demand:
+                m.addConstr(quicksum(flow[h,i,j] for i,j in arcs.select('*',j)) == quicksum(flow[h,j,k] for j,k in arcs.select(j,'*')), 'inter_flowconst_%s_%s' % (h, j))
 
 
     # Compute optimal solution
@@ -167,7 +141,7 @@ def secure_path_minviobound(nodes,arcs,capacity,security_labels):
         print'Done'
         return solution,missingcats
     else:
-        #m.computeIIS()
-        #m.write("model.ilp");
-        return 'Infeasible'
+        m.computeIIS()
+        m.write("model.ilp");
+        return 'Infeasible',''
 

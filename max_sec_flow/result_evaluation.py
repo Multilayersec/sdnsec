@@ -140,7 +140,7 @@ def stepviolations(violations):
     #ax1.legend()
     plt.show()
 
-def categoryvios(violations,model):
+def categoryvios(violations,model,title):
     cmap = matplotlib.cm.get_cmap('jet')
     width = 0.35  # the width of the bars
 
@@ -157,7 +157,7 @@ def categoryvios(violations,model):
     colors=[]
     #for key in violations.keys():
     for (key,value) in sorted_vio:
-        if value!=0:
+        if value>=1:
             values.append(value)
             if max<value:
                 max=value
@@ -170,10 +170,11 @@ def categoryvios(violations,model):
 
     rects1 = ax.bar(ind, values, width, color=colors)
 
-    ax.set_ylim((0, (max + 1)))
+    ax.set_ylim((0, (max + 10)))
     # add some text for labels, title and axes ticks
-    ax.set_title('Security violations')
+    ax.set_title(title)
     ax.set_xticks(ind + width / 2)
+    ax.set_ylabel("%")
     #ax.set_xticklabels(range(0,len(violations.keys())))
     ax.set_xticklabels(xlabels, fontsize=10)
 
@@ -200,41 +201,60 @@ def categoryvios(violations,model):
 def visualize_results(solution,executions):
 
     violations={}
+    transitions = 0
     for h in solution.keys():
-        for i,j,si,sj in  solution[h]:
-            diff=getLabelViolations(abs(si[0]-sj[0]))
+        for i,j,si,sj in solution[h]:
+            transitions += 1
+            if si[0]!=0 and sj[0]!=0:
+                diff=getLabelViolations(abs(si[0]-sj[0]))
+            else:
+                diff=getLabelViolations(0)
             if not violations.has_key(diff):
                 violations[diff] = 0
             violations[diff] = violations[diff] + 1
 
+    transitions = transitions / executions
+
     #calc averaage
     for key in violations.keys():
-        violations[key] = violations[key]/executions
+        violations[key] = float(violations[key]) / float(executions)
+        violations[key] = (float(violations[key]) / float(transitions))*100
 
     #sumviolations(violations)
-    categoryvios(violations,'sumviolations')
+    categoryvios(violations,'static_sumviolations','Security violations')
 
     secchanges={}
+    transitions = 0
     for h in solution.keys():
-        for i,j,si,sj in  solution[h]:
+        for i,j,si,sj in solution[h]:
+            transitions += 1
             key = getLabel(si[0]) + ">" + getLabel(sj[0])
             if not secchanges.has_key(key):
                 secchanges[key]=0
             secchanges[key]=secchanges[key]+1
 
+    transitions = transitions / executions
+
     # calc averaage
     for key in secchanges.keys():
-        secchanges[key] = secchanges[key] / executions
+        secchanges[key] = float(secchanges[key]) / float(executions)
+        secchanges[key] = (float(secchanges[key]) / float(transitions))*100
 
     #stepviolations(secchanges)
-    categoryvios(secchanges,'categoryviolations')
+    categoryvios(secchanges,'static_categoryviolations','Security violations')
 
 def visualize_misses(solution,executions):
 
     misses={}
+    sum=0
     for key in solution.keys():
-        cnt = solution[key] / executions
+        sum+=solution[key]
+    sum = sum / executions
+
+    for key in solution.keys():
+        cnt = float(solution[key]) / float(executions)
+        cnt = (float(cnt) / float(sum))*100
         misses[str(key) + ' Categories'] = cnt
 
     #sumviolations(violations)
-    categoryvios(misses,'catmisses')
+    categoryvios(misses,'static_catmisses','Missing categories')
